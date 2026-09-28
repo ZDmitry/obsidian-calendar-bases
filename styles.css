@@ -290,7 +290,10 @@ body {
   }
 
   .fc-event {
-    background-color: var(--background-secondary) !important;
+    background-color: var(
+      --calendar-event-bg,
+      var(--background-secondary)
+    ) !important;
     border: none !important;
     border-radius: 3px !important;
     font-weight: 500 !important;
@@ -317,6 +320,14 @@ body {
 
   .fc-event-title-container {
     color: var(--text-normal) !important;
+  }
+
+  /* Year view (multiMonthYear) — per-month heading inside the grid */
+  .fc-multimonth-title {
+    color: var(--text-normal) !important;
+    font-weight: 600 !important;
+    font-size: var(--font-ui-small) !important;
+    padding: var(--size-4-2) var(--size-4-1) !important;
   }
 }
 

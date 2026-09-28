@@ -19,6 +19,7 @@ interface CalendarEntry {
   entry: BasesEntry;
   startDate: Date;
   endDate?: Date;
+  color?: string;
 }
 
 export class CalendarView extends BasesView {
@@ -32,6 +33,7 @@ export class CalendarView extends BasesView {
   private entries: CalendarEntry[] = [];
   private startDateProp: BasesPropertyId | null = null;
   private endDateProp: BasesPropertyId | null = null;
+  private colorProp: BasesPropertyId | null = null;
   private weekStartDay: number = 1;
 
   constructor(controller: QueryController, scrollEl: HTMLElement) {
@@ -73,6 +75,7 @@ export class CalendarView extends BasesView {
   private loadConfig(): void {
     this.startDateProp = this.config.getAsPropertyId("startDate");
     this.endDateProp = this.config.getAsPropertyId("endDate");
+    this.colorProp = this.config.getAsPropertyId("colorProperty");
     const weekStartDayValue = this.config.get("weekStartDay") as string;
 
     const dayNameToNumber: Record<string, number> = {
@@ -107,10 +110,14 @@ export class CalendarView extends BasesView {
         const endDate = this.endDateProp
           ? (this.extractDate(entry, this.endDateProp) ?? undefined)
           : undefined;
+        const color = this.colorProp
+          ? this.extractColor(entry, this.colorProp)
+          : undefined;
         this.entries.push({
           entry,
           startDate,
           endDate,
+          color,
         });
       }
     }
@@ -178,6 +185,21 @@ export class CalendarView extends BasesView {
     } catch (error) {
       console.error(`Error extracting date for ${entry.file.name}:`, error);
       return null;
+    }
+  }
+
+  private extractColor(
+    entry: BasesEntry,
+    propId: BasesPropertyId,
+  ): string | undefined {
+    try {
+      const value = entry.getValue(propId);
+      if (!value || !value.isTruthy()) return undefined;
+      const color = value.toString().trim();
+      return color.length > 0 ? color : undefined;
+    } catch (error) {
+      console.error(`Error extracting color for ${entry.file.name}:`, error);
+      return undefined;
     }
   }
 
@@ -263,6 +285,18 @@ export class CalendarView extends BasesView {
             displayName: "End date (optional)",
             type: "property",
             key: "endDate",
+            placeholder: "Property",
+          },
+        ],
+      },
+      {
+        displayName: "Appearance",
+        type: "group",
+        items: [
+          {
+            displayName: "Event color (optional)",
+            type: "property",
+            key: "colorProperty",
             placeholder: "Property",
           },
         ],

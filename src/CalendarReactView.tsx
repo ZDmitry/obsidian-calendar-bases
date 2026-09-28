@@ -1,20 +1,30 @@
 import type {
+  DatesSetArg,
   EventApi,
   EventClickArg,
   EventContentArg,
   EventDropArg,
+  EventMountArg,
 } from "@fullcalendar/core";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import interactionPlugin from "@fullcalendar/interaction";
+import multiMonthPlugin from "@fullcalendar/multimonth";
 import FullCalendar from "@fullcalendar/react";
-import { BasesEntry, BasesPropertyId, DateValue, Value } from "obsidian";
-import React, { useCallback, useEffect, useRef } from "react";
+import { BasesEntry, BasesPropertyId, DateValue, Menu, Value } from "obsidian";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 
 import { useApp } from "./hooks";
 
 export interface CalendarHandle {
   updateSize(): void;
 }
+
+type FullCalendarViewType = "dayGridMonth" | "multiMonthYear";
+
+const VIEW_MODE_LABELS: Record<FullCalendarViewType, string> = {
+  dayGridMonth: "Month",
+  multiMonthYear: "Year",
+};
 
 interface CalendarReactViewProps {
   entries: CalendarEntry[];
@@ -43,6 +53,8 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
 }) => {
   const app = useApp();
   const calendarRef = useRef<FullCalendar>(null);
+  const [viewType, setViewType] =
+    useState<FullCalendarViewType>("dayGridMonth");
   // Shared hover parent so Page Preview can manage popover lifecycle —
   // when a new popover opens, the old one on the same parent is dismissed.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -98,6 +110,7 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
       extendedProps: {
         entry: calEntry.entry,
         originalEndDate: calEntry.endDate, // Keep track of original end date for drag operations
+        color: calEntry.color,
       },
     };
   });
@@ -172,6 +185,43 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
       el.addEventListener("contextmenu", contextMenuHandler);
     },
     [app, onEntryContextMenu],
+  );
+
+  const handleEventDidMount = useCallback((arg: EventMountArg) => {
+    const color = arg.event.extendedProps.color as string | undefined;
+    if (color && CSS.supports("color", color)) {
+      arg.el.style.setProperty("--calendar-event-bg", color);
+    } else {
+      arg.el.style.removeProperty("--calendar-event-bg");
+    }
+  }, []);
+
+  const handleDatesSet = useCallback((arg: DatesSetArg) => {
+    const type = arg.view.type;
+    if (type === "dayGridMonth" || type === "multiMonthYear") {
+      setViewType(type);
+    }
+  }, []);
+
+  const handleViewSwitcherClick = useCallback(
+    (jsEvent: MouseEvent) => {
+      const calendarApi = calendarRef.current?.getApi();
+      if (!calendarApi) return;
+
+      const menu = new Menu();
+      (Object.keys(VIEW_MODE_LABELS) as FullCalendarViewType[]).forEach(
+        (mode) => {
+          menu.addItem((item) =>
+            item
+              .setTitle(VIEW_MODE_LABELS[mode])
+              .setChecked(viewType === mode)
+              .onClick(() => calendarApi.changeView(mode)),
+          );
+        },
+      );
+      menu.showAtMouseEvent(jsEvent);
+    },
+    [viewType],
   );
 
   const handleEventDrop = useCallback(
@@ -324,20 +374,28 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
   return (
     <FullCalendar
       ref={calendarRef}
-      plugins={[dayGridPlugin, interactionPlugin]}
+      plugins={[dayGridPlugin, multiMonthPlugin, interactionPlugin]}
       initialView="dayGridMonth"
       firstDay={weekStartDay}
       headerToolbar={{
         left: "",
         center: "title",
-        right: "prev,today,next",
+        right: "viewSwitcher prev,today,next",
+      }}
+      customButtons={{
+        viewSwitcher: {
+          text: VIEW_MODE_LABELS[viewType],
+          click: handleViewSwitcherClick,
+        },
       }}
       buttonText={{
         today: "Today",
       }}
       navLinks={false}
       events={events}
+      datesSet={handleDatesSet}
       eventContent={renderEventContent}
+      eventDidMount={handleEventDidMount}
       eventClick={handleEventClick}
       eventMouseEnter={handleEventMouseEnter}
       eventDrop={(info) => void handleEventDrop(info)}
@@ -354,6 +412,7 @@ interface CalendarEntry {
   entry: BasesEntry;
   startDate: Date;
   endDate?: Date;
+  color?: string;
 }
 
 function tryGetValue(entry: BasesEntry, propId: BasesPropertyId): Value | null {
